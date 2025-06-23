@@ -1,4 +1,3 @@
-<!-- app/templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,29 +10,8 @@
         h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
-        input[type="text"], input[type="number"], select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box; /* Important */
-            transition: border-color 0.3s;
-        }
-        input:focus, select:focus { border-color: #3498db; outline: none; }
-        .submit-btn {
-            display: block;
-            width: 100%;
-            padding: 15px;
-            border: none;
-            background-color: #3498db;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .submit-btn:hover { background-color: #2980b9; }
+        input[type="number"], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .submit-btn { display: block; width: 100%; padding: 15px; border: none; background-color: #3498db; color: white; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -43,14 +21,21 @@
             
             <div class="form-group">
                 <label for="brand">Brand</label>
-                <!-- This should be populated with brands from your dataset for best results -->
                 <select id="brand" name="brand" required>
-                    <option value="ford">Ford</option>
-                    <option value="chevrolet">Chevrolet</option>
-                    <option value="nissan">Nissan</option>
-                    <option value="dodge">Dodge</option>
-                    <!-- Add more brands as needed -->
+                    {% for brand in brands %}
+                        <option value="{{ brand }}">{{ brand }}</option>
+                    {% endfor %}
                 </select>
+            </div>
+
+            <div class="form-group">
+                <label for="model">Model</label>
+                <select id="model" name="model" required></select>
+            </div>
+            
+            <div class="form-group">
+                <label for="transmission">Transmission</label>
+                <select id="transmission" name="transmission" required></select>
             </div>
 
             <div class="form-group">
@@ -66,27 +51,65 @@
             <div class="form-group">
                 <label for="fuel_type">Fuel Type</label>
                 <select id="fuel_type" name="fuel_type" required>
-                    <option value="Gasoline">Gasoline</option>
-                    <option value="E85 Flex Fuel">E85 Flex Fuel</option>
-                    <option value="Diesel">Diesel</option>
-                    <option value="Hybrid">Hybrid</option>
+                    {% for type in fuel_types %}
+                        <option value="{{ type }}">{{ type }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
-            <div class="form-group">
-                <label for="transmission">Transmission</label>
-                <select id="transmission" name="transmission" required>
-                    <option value="Automatic">Automatic</option>
-                    <option value="Manual">Manual</option>
-                </select>
-            </div>
-
-            <!-- Hidden fields for simplicity, can be expanded into form elements -->
-            <input type="hidden" name="accident" value="None">
+            <input type="hidden" name="accident" value="None reported">
             <input type="hidden" name="clean_title" value="Yes">
 
             <button type="submit" class="submit-btn">Predict Price</button>
         </form>
     </div>
+
+    <script>
+        // Use the |tojson filter to safely get the data from Python
+        const modelsData = {{ brand_to_models_map | tojson }};
+        const transmissionsData = {{ brand_model_to_trans_map | tojson }};
+
+        const brandSelect = document.getElementById('brand');
+        const modelSelect = document.getElementById('model');
+        const transmissionSelect = document.getElementById('transmission');
+
+        function updateTransmissions() {
+            const selectedBrand = brandSelect.value;
+            const selectedModel = modelSelect.value;
+            const transmissions = (transmissionsData[selectedBrand] && transmissionsData[selectedBrand][selectedModel]) || [];
+            
+            transmissionSelect.innerHTML = '';
+            transmissions.forEach(function(trans) {
+                const option = document.createElement('option');
+                option.value = trans;
+                option.textContent = trans;
+                transmissionSelect.appendChild(option);
+            });
+        }
+
+        function updateModels() {
+            const selectedBrand = brandSelect.value;
+            const models = modelsData[selectedBrand] || [];
+            
+            modelSelect.innerHTML = '';
+            models.forEach(function(model) {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+            // After updating models, immediately update transmissions for the new first model
+            updateTransmissions();
+        }
+        
+        // Add event listeners to call the update functions whenever a selection changes
+        brandSelect.addEventListener('change', updateModels);
+        modelSelect.addEventListener('change', updateTransmissions);
+
+        // Initial population on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateModels();
+        });
+    </script>
 </body>
 </html>

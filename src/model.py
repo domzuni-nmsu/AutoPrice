@@ -1,26 +1,20 @@
-# src/model.py (Corrected Version)
-import torch
+# This is the single, correct model definition.
+# Use this exact class in both src/model.py and src/train.py
+
 import torch.nn as nn
 
 class PricePredictor(nn.Module):
-    # The parameter name is now corrected to 'num_input_features'
-    def __init__(self, num_input_features, hidden_size1=128, hidden_size2=64, dropout_rate=0.2):
+    def __init__(self, num_input_features):
         super(PricePredictor, self).__init__()
-        # It is also corrected here where it's used
-        self.layer1 = nn.Linear(num_input_features, hidden_size1)
+        # Use underscores for layer names consistently
+        self.layer_1 = nn.Linear(num_input_features, 128)
         self.relu1 = nn.ReLU()
-        self.dropout1 = nn.Dropout(dropout_rate)
-        self.layer2 = nn.Linear(hidden_size1, hidden_size2)
+        self.layer_2 = nn.Linear(128, 64)
         self.relu2 = nn.ReLU()
-        self.dropout2 = nn.Dropout(dropout_rate)
-        self.output_layer = nn.Linear(hidden_size2, 1)
+        self.output_layer = nn.Linear(64, 1)
 
     def forward(self, x):
-        x = self.layer1(x)
-        x = self.relu1(x)
-        x = self.dropout1(x)
-        x = self.layer2(x)
-        x = self.relu2(x)
-        x = self.dropout2(x)
+        x = self.relu1(self.layer_1(x))
+        x = self.relu2(self.layer_2(x))
         x = self.output_layer(x)
         return x
