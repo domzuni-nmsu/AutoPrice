@@ -1,4 +1,6 @@
-# src/train.py (Corrected)
+# src/create_artifacts.py
+# This single script will create all your necessary files in perfect sync.
+
 import pandas as pd
 import numpy as np
 import torch
@@ -9,9 +11,8 @@ import os
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-# ... (rest of your imports)
 
-# --- Define Model Architecture ---
+# --- 1. DEFINE YOUR MODEL ARCHITECTURE ---
 class PricePredictor(nn.Module):
     def __init__(self, num_input_features):
         super(PricePredictor, self).__init__()
@@ -22,67 +23,85 @@ class PricePredictor(nn.Module):
         self.output_layer = nn.Linear(64, 1)
 
     def forward(self, x):
-        x = self.relu1(self.layer_1(x)); x = self.relu2(self.layer_2(x)); x = self.output_layer(x); return x
+        x = self.relu1(self.layer_1(x))
+        x = self.relu2(self.layer_2(x))
+        x = self.output_layer(x)
+        return x
 
-# --- Main Training Logic ---
-print("--- Starting Data Loading and Preprocessing ---")
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(BASE_DIR)
+# --- 2. DEFINE PATHS AND LOAD DATA ---
+print("--- Starting Artifact Creation Script ---")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SAVE_DIR = os.path.join(PROJECT_ROOT, 'saved_models')
+RAW_DATA_PATH = os.path.join(PROJECT_ROOT, 'data', 'raw', 'used_cars.csv')
+
+os.makedirs(SAVE_DIR, exist_ok=True) # Ensure save directory exists
 
 try:
-    file_path = os.path.join(PROJECT_ROOT, 'data', 'raw', 'used_cars.csv')
-    df = pd.read_csv(file_path)
-    print("Loaded raw data.")
-    
-    # --- Data Cleaning and Feature Engineering ---
-    df.dropna(subset=['price', 'milage'], inplace=True)
+    df = pd.read_csv(RAW_DATA_PATH)
+    print("Loaded raw data successfully.")
+
+    # --- 3. COMPLETE DATA CLEANING & FEATURE ENGINEERING ---
     df['price'] = pd.to_numeric(df['price'].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False), errors='coerce')
     df['milage'] = pd.to_numeric(df['milage'].astype(str).str.replace(' mi.', '', regex=False).str.replace(',', '', regex=False), errors='coerce')
+    df.dropna(subset=['price', 'milage'], inplace=True)
+    
     df['car_age'] = 2025 - df['model_year']
     
-    # Impute missing values
     for col in ['fuel_type', 'transmission', 'accident', 'clean_title']:
-        if col in df.columns and df[col].isnull().any():
+        if col in df.columns:
             df[col].fillna(df[col].mode()[0], inplace=True)
             
     df['price'] = np.log1p(df['price'])
-    df.dropna(subset=['price', 'milage'], inplace=True)
-    print("Data cleaning complete.")
+    print("Data cleaning and feature engineering complete.")
 
-    # --- Preprocessing and Splitting ---
+    # --- 4. PREPARE FOR PREPROCESSING ---
     feature_columns = ['milage', 'model_year', 'car_age', 'brand', 'fuel_type', 'transmission', 'accident', 'clean_title']
     X = df[feature_columns]
     y = df['price']
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     numerical_features = X_train.select_dtypes(include=np.number).columns.tolist()
     categorical_features = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
-    
+
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', StandardScaler(), numerical_features),
             ('cat', OneHotEncoder(handle_unknown='ignore', drop='first'), categorical_features)
-        ],
-        remainder='passthrough'
+        ]
     )
     
-    print("Fitting preprocessor...")
+    # --- 5. FIT PREPROCESSOR AND SAVE ARTIFACTS ---
+    print("\n--- Fitting preprocessor and transforming data ---")
     preprocessor.fit(X_train)
     
-    # Apply the transformation
+    # Transform data
     X_train_processed = preprocessor.transform(X_train)
+    X_test_processed = preprocessor.transform(X_test)
     
-    # --- GET FINAL FEATURE COUNT FROM PREPROCESSOR ---
-    MODEL_INPUT_FEATURES = X_train_processed.shape[1]
-    print(f"Determined model input features from preprocessor: {MODEL_INPUT_FEATURES}")
+    # Get the final feature count AFTER transformation
+    FINAL_FEATURE_COUNT = X_train_processed.shape[1]
+    print(f"Final number of features after encoding: {FINAL_FEATURE_COUNT}")
+
+    # Save the fitted preprocessor
+    joblib.dump(preprocessor, os.path.join(SAVE_DIR, 'preprocessor.joblib'))
+    print("Preprocessor saved successfully.")
+    
+    # Save the original column order that goes INTO the preprocessor
+    # This is needed by the Flask app to create the input DataFrame correctly
+    joblib.dump(X_train.columns.tolist(), os.path.join(SAVE_DIR, 'training_columns.joblib'))
+    print("Training columns list saved successfully.")
+
+    # --- 6. TRAIN AND SAVE THE MODEL ---
+    print("\n--- Training New PyTorch Model ---")
     
     # Convert to Tensors
     X_train_tensor = torch.tensor(X_train_processed.toarray(), dtype=torch.float32)
     y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).unsqueeze(1)
     
-    # --- Train and Save the Model ---
-    print("\n--- Training New PyTorch Model ---")
-    model = PricePredictor(num_input_features=MODEL_INPUT_FEATURES)
+    # Initialize model with the CORRECT feature count
+    model = PricePredictor(num_input_features=FINAL_FEATURE_COUNT)
+    
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
@@ -94,19 +113,12 @@ try:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 50 == 0:
             print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
-
-    # --- Save the synced artifacts ---
-    save_dir = os.path.join(PROJECT_ROOT, 'saved_models')
-    os.makedirs(save_dir, exist_ok=True)
-    
-    joblib.dump(preprocessor, os.path.join(save_dir, 'preprocessor.joblib'))
-    print("Preprocessor saved successfully.")
-    
-    torch.save(model.state_dict(), os.path.join(save_dir, 'price_predictor_model_v1.pth'))
+            
+    # Save the final trained model
+    torch.save(model.state_dict(), os.path.join(SAVE_DIR, 'price_predictor_model_v1.pth'))
     print("\n✅ New model trained and saved successfully!")
-    print(f"Model input layer shape is now compatible with {MODEL_INPUT_FEATURES} features.")
 
 except Exception as e:
-    print(f"\nAn error occurred during the training script: {e}")
+    print(f"\nAn error occurred during the script: {e}")

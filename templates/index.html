@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Car Price Predictor</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: #f4f4f9; 
+            color: #333; 
+            line-height: 1.6; 
+            padding: 20px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container { 
+            max-width: 600px; 
+            width: 100%;
+            margin: 40px auto; 
+            padding: 30px; 
+            background-color: #fff; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 25px rgba(0,0,0,0.1); 
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600; 
+            color: #555; 
+        }
+        input[type="number"], select { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .submit-btn { 
+            display: block; 
+            width: 100%; 
+            padding: 15px; 
+            border: none; 
+            background-color: #3498db; 
+            color: white; 
+            font-size: 16px; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: background-color 0.3s;
+        }
+        .submit-btn:hover { 
+            background-color: #2980b9; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Car Price Prediction</h1>
+        <form action="/predict" method="post">
+            
+            <!-- Brand Dropdown -->
+            <div class="form-group">
+                <label for="brand">Brand</label>
+                <select id="brand" name="brand" required>
+                    <option value="" selected disabled>-- Select a Brand --</option>
+                    {% for brand in brands %}
+                        <option value="{{ brand }}">{{ brand }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Model Dropdown (Populated by JavaScript) -->
+            <div class="form-group">
+                <label for="model">Model</label>
+                <select id="model" name="model" required></select>
+            </div>
+            
+            <!-- Transmission Dropdown (Populated by JavaScript) -->
+            <div class="form-group">
+                <label for="transmission">Transmission</label>
+                <select id="transmission" name="transmission" required></select>
+            </div>
+
+            <!-- Model Year Input -->
+            <div class="form-group">
+                <label for="model_year">Model Year</label>
+                <input type="number" id="model_year" name="model_year" placeholder="e.g., 2018" required>
+            </div>
+
+            <!-- Mileage Input -->
+            <div class="form-group">
+                <label for="milage">Mileage</label>
+                <input type="number" id="milage" name="milage" placeholder="e.g., 50000" required>
+            </div>
+
+            <!-- Fuel Type Dropdown -->
+            <div class="form-group">
+                <label for="fuel_type">Fuel Type</label>
+                <select id="fuel_type" name="fuel_type" required>
+                    <option value="" selected disabled>-- Select a Fuel Type --</option>
+                    {% for type in fuel_types %}
+                        <option value="{{ type }}">{{ type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Hidden fields for features not in the form -->
+            <input type="hidden" name="accident" value="None reported">
+            <input type="hidden" name="clean_title" value="Yes">
+
+            <button type="submit" class="submit-btn">Predict Price</button>
+        </form>
+    </div>
+
+    <script>
+        // Use the |tojson filter to safely serialize the Python dicts for JavaScript
+        const modelsData = {{ brand_to_models_map | tojson }};
+        const transmissionsData = {{ brand_model_to_trans_map | tojson }};
+
+        // Get references to the dropdown elements
+        const brandSelect = document.getElementById('brand');
+        const modelSelect = document.getElementById('model');
+        const transmissionSelect = document.getElementById('transmission');
+
+        // Function to update the 'Model' dropdown based on the selected 'Brand'
+        function updateModels() {
+            const selectedBrand = brandSelect.value;
+            const models = modelsData[selectedBrand] || [];
+            
+            // Clear current options and add a default placeholder
+            modelSelect.innerHTML = '<option value="" selected disabled>-- Select a Model --</option>';
+            
+            // Populate with new options
+            models.forEach(function(model) {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+            
+            // Immediately update the next dropdown in the chain
+            updateTransmissions();
+        }
+
+        // Function to update the 'Transmission' dropdown based on 'Brand' and 'Model'
+        function updateTransmissions() {
+            const selectedBrand = brandSelect.value;
+            const selectedModel = modelSelect.value;
+            
+            // Safely access the nested dictionary to get the list of transmissions
+            const transmissions = (transmissionsData[selectedBrand] && transmissionsData[selectedBrand][selectedModel]) || [];
+            
+            // Clear current options and add a default placeholder
+            transmissionSelect.innerHTML = '<option value="" selected disabled>-- Select a Transmission --</option>';
+            
+            // Populate with new options
+            transmissions.forEach(function(trans) {
+                const option = document.createElement('option');
+                option.value = trans;
+                option.textContent = trans;
+                transmissionSelect.appendChild(option);
+            });
+        }
+        
+        // Add event listeners to trigger the update functions when a selection changes
+        brandSelect.addEventListener('change', updateModels);
+        modelSelect.addEventListener('change', updateTransmissions);
+
+        // Set the initial state of the dropdowns when the page first loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateModels();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!-- app/templates/results.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Result</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f4f9; color: #333; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .container { text-align: center; padding: 40px; background-color: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: #2c3e50; margin-bottom: 20px; }
+        .result { font-size: 28px; font-weight: bold; color: #27ae60; margin-bottom: 30px; }
+        .back-link {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+        }
+        .back-link:hover { background-color: #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Predicted Car Price</h1>
+        <!-- The 'prediction' variable is passed from the Flask app -->
+        <p class="result">{{ prediction }}</p>
+        <a href="/" class="back-link">Make Another Prediction</a>
+    </div>
+</body>
+</html>
